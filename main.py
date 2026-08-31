@@ -1,31 +1,59 @@
+import json
+import time
 from ollama import chat
 
-def ask_ai(question):
+def ask_ai(question, history):
+    history.append({
+        "role": "user",
+        "content": question
+    })
+
     response = chat(
         model="qwen3:4b",
-        messages=[
-            {
-                "role": "system",
-                "content": """
-                You are a cybersecurity assistant.
-
-                Your job is to:
-                - answer cybersecurity questions clearly
-                - explain concepts at the user's level
-                - analyse cybersecurity data
-                - distinguish facts from assumptions
-                - focus on defensive and authorized security work
-                """
-            },
-            {
-                "role": "user",
-                "content": question
-            }
-        ],
+        messages=history,
         think=False
     )
 
-    return response.message.content
+    answer = response.message.content
+
+    history.append({
+        "role": "assistant",
+        "content": answer
+    })
+
+    return answer
+
+def start_chat():
+    history = [
+        {
+            "role": "system",
+            "content": """
+            You are a cybersecurity assistant.
+
+            Your job is to:
+            - answer cybersecurity questions clearly
+            - explain concepts at the user's level
+            - analyse cybersecurity data
+            - distinguish facts from assumptions
+            - focus on defensive and authorized security work
+            """
+        }
+    ]
+
+    print("\nCyberSec AI Chat")
+    print("Type 'exit' to return.\n")
+
+    while True:
+        question = input("You: ")
+
+        if question.lower() == "exit":
+            break
+
+        answer = ask_ai(question, history)
+
+        print("\nCyberSec AI:")
+        print(answer)
+        print()
 
 def analyse_scan(results):
     prompt = f"""
@@ -33,16 +61,60 @@ def analyse_scan(results):
 
     {results}
 
-    For every service:
-    - explain what the service is
-    - identify relevant security concerns
-    - explain why they matter
-    - suggest safe, authorized investigation steps
+    Return ONLY valid JSON.
 
-    Do not assume a vulnerability exists just because a port is open.
+    Use exactly this structure:
+
+    {{
+        "findings": [
+            {{
+                "port": 22,
+                "service": "ssh",
+                "severity": "informational",
+                "confidence": "high",
+                "finding": "SSH service detected",
+                "reason": "An SSH service is listening on port 22.",
+                "recommendation": "Identify the SSH version and review its authentication configuration."
+            }}
+        ]
+    }}
+
+    Severity must be one of:
+    - informational
+    - low
+    - medium
+    - high
+    - critical
+
+    Confidence must be one of:
+    - low
+    - medium
+    - high
+
+    Important:
+    - Do not claim a vulnerability exists without evidence.
+    - An open port alone is not a vulnerability.
+    - Base findings only on the supplied scan.
+    - Focus on defensive and authorized security analysis.
     """
 
-    return ask_ai(prompt)
+    response = chat(
+        model="qwen3:4b",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a cybersecurity analysis assistant."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        format="json",
+        think=False
+    )
+
+    return json.loads(response.message.content)
 
 def get_scan():
     print("Paste Nmap results.")
@@ -126,12 +198,7 @@ def main():
     choice = input("\nChoose an option: ")
 
     if choice == "1":
-        question = input("\nCybersecurity question: ")
-
-        answer = ask_ai(question)
-
-        print("\nCyberSec AI:")
-        print(answer)
+        start_chat()
 
     elif choice == "2":
         scans = get_scan()
@@ -160,10 +227,25 @@ def main():
 
         print("\nAnalysing scan...\n")
 
-        answer = analyse_scan(results)
+        start = time.time()
 
-        print("CyberSec AI:")
-        print(answer)
+        analysis = analyse_scan(results)
+
+        end = time.time()
+
+        print(f"Analysis took {end - start:.2f} seconds.\n")
+
+        print("CyberSec AI:\n")
+
+        for finding in analysis["findings"]:
+            print("Port:", finding["port"])
+            print("Service:", finding["service"])
+            print("Severity:", finding["severity"])
+            print("Confidence:", finding["confidence"])
+            print("Finding:", finding["finding"])
+            print("Reason:", finding["reason"])
+            print("Recommendation:", finding["recommendation"])
+            print()
 
     else:
         print("Invalid option.")
