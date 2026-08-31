@@ -29,3 +29,8 @@ Planned features include:
 - CVE/CWE lookup
 - Structured vulnerability findings
 - Cybersecurity knowledge retrieval
+- Conversation memory
+- File support
+- Detailed security report/summary
+- Tool integration (Nmap, Wireshark, Burp)
+- Web interface
