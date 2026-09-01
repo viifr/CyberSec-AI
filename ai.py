@@ -126,3 +126,87 @@ Rules:
     )
 
     return json.loads(response.message.content)
+
+def analyse_http(request_data):
+    prompt = f"""
+Analyse this HTTP request:
+
+{request_data}
+
+Identify:
+- factual observations
+- potential security areas worth reviewing
+- safe recommendations
+
+Do not claim a vulnerability exists unless the request proves it.
+A parameter existing does not mean it is vulnerable.
+Keep the analysis concise.
+"""
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "observations": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            },
+            "potential_areas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "confidence": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"]
+                        },
+                        "reason": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "name",
+                        "confidence",
+                        "reason"
+                    ]
+                }
+            },
+            "recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": [
+            "observations",
+            "potential_areas",
+            "recommendations"
+        ]
+    }
+
+    response = chat(
+        model="qwen3:4b",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a concise HTTP security analysis assistant."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        format=schema,
+        think=False,
+        options={
+            "temperature": 0,
+            "num_predict": 400
+        }
+    )
+
+    return json.loads(response.message.content)
