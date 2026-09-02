@@ -1,8 +1,12 @@
 import json
+import re
 from ollama import chat
 
+MODEL = "qwen3:8b"
 
 SYSTEM_PROMPT = """
+/no_think
+
 You are a cybersecurity assistant.
 
 Give clear, concise answers.
@@ -18,6 +22,19 @@ Focus on defensive and authorized security work.
 """
 
 
+def clean_ai_response(response):
+    answer = response.message.content or ""
+
+    closing_tag = re.search(r"</think>", answer, flags=re.IGNORECASE)
+    opening_tag = re.search(r"<think>", answer, flags=re.IGNORECASE)
+
+    if closing_tag:
+        answer = answer[closing_tag.end():]
+    elif opening_tag:
+        answer = answer[:opening_tag.start()]
+
+    return answer.strip()
+
 def ask_ai(question, history):
     history.append({
         "role": "user",
@@ -25,16 +42,16 @@ def ask_ai(question, history):
     })
 
     response = chat(
-        model="qwen3:4b",
+        model=MODEL,
         messages=history,
         think=False,
         options={
             "temperature": 0.3,
-            "num_predict": 250
+            "num_predict": 500
         }
     )
 
-    answer = response.message.content
+    answer = clean_ai_response(response)
 
     history.append({
         "role": "assistant",
@@ -58,8 +75,14 @@ def start_chat():
     while True:
         question = input("You: ")
 
+        question = question.strip()
+
         if question.lower() == "exit":
             break
+
+        if not question:
+            print("Please enter a question, or type 'exit' to return.")
+            continue
 
         answer = ask_ai(question, history)
 
@@ -106,7 +129,7 @@ Rules:
 """
 
     response = chat(
-        model="qwen3:4b",
+        model=MODEL,
         messages=[
             {
                 "role": "system",
@@ -125,7 +148,9 @@ Rules:
         }
     )
 
-    return json.loads(response.message.content)
+    cleaned_response = clean_ai_response(response)
+
+    return json.loads(cleaned_response)
 
 def analyse_http(request_data):
     prompt = f"""
@@ -190,7 +215,7 @@ Keep the analysis concise.
     }
 
     response = chat(
-        model="qwen3:4b",
+        model=MODEL,
         messages=[
             {
                 "role": "system",
@@ -209,4 +234,6 @@ Keep the analysis concise.
         }
     )
 
-    return json.loads(response.message.content)
+    cleaned_response = clean_ai_response(response)
+
+    return json.loads(cleaned_response)
