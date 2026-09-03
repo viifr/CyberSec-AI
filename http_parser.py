@@ -1,6 +1,39 @@
 import json
 from urllib.parse import urlsplit, parse_qs
 
+REDACTED_HEADERS = {
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "proxy-authorization",
+    "x-api-key",
+    "api-key",
+}
+
+REDACTED_PARAM_KEYWORDS = ("password", "passwd", "token", "secret", "api_key", "apikey")
+
+
+def is_sensitive_key(key):
+    lowered_key = key.lower()
+    return lowered_key in REDACTED_HEADERS or any(
+        keyword in lowered_key for keyword in REDACTED_PARAM_KEYWORDS
+    )
+
+
+def redact_request_data(request_data):
+    redacted = dict(request_data)
+
+    for field in ("headers", "cookies", "query_parameters", "body_parameters"):
+        values = redacted.get(field)
+
+        if isinstance(values, dict):
+            redacted[field] = {
+                key: ("[REDACTED]" if is_sensitive_key(key) else value)
+                for key, value in values.items()
+            }
+
+    return redacted
+
 
 def get_http_request():
     print("\nPaste the HTTP request.")
@@ -53,7 +86,7 @@ def parse_http_request(request):
             continue
 
         name, value = line.split(":", 1)
-        headers[name.strip()] = value.strip()
+        headers[name.strip().lower()] = value.strip()
 
     body = "\n".join(body_lines)
 
@@ -81,7 +114,7 @@ def extract_body_parameters(body, headers):
     if not body:
         return {}
 
-    content_type = headers.get("Content-Type", "")
+    content_type = headers.get("content-Type", "")
 
     if "application/x-www-form-urlencoded" in content_type:
         return parse_qs(body)
@@ -98,7 +131,7 @@ def extract_body_parameters(body, headers):
 def extract_cookies(headers):
     cookies = {}
 
-    cookie_header = headers.get("Cookie")
+    cookie_header = headers.get("cookie")
 
     if not cookie_header:
         return cookies
