@@ -7,6 +7,7 @@ Ollama and Qwen.
 
 - General cybersecurity Q&A
 - Nmap scan parsing
+- Nmap XML parsing with service metadata and CPE extraction
 - AI-assisted Nmap analysis
 - Runs locally without requiring a paid AI API
 

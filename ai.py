@@ -315,6 +315,8 @@ Assess how relevant these candidate CVEs are to the supplied Nmap scan.
 
 Rules:
 - A CVE database match does NOT prove the target is vulnerable.
+- Treat exact_cpe matches as stronger evidence than keyword_candidate matches,
+  but still require verification of the installed product, version, and configuration.
 - Only use information contained in the scan and CVE data.
 - Do not invent operating systems, configurations, patch states, or versions.
 - If there is not enough evidence, clearly say so.

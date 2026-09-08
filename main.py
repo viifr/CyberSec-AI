@@ -79,6 +79,9 @@ def analyse_nmap():
             f"Port {service_result['port']}: "
             f"{service_result['service']} {service_result['version']}"
         )
+        print("Lookup method:", service_result.get("lookup_method", "Unknown"))
+        if service_result.get("cpe"):
+            print("CPE:", service_result["cpe"])
 
         if not service_result["cves"]:
             print("- No matching CVEs returned.")
@@ -89,6 +92,7 @@ def analyse_nmap():
                 f"score: {cve['score']} | published: {cve['published']}"
             )
             print(" ", cve["description"])
+            print("  Verification:", cve.get("verification", "Verify manually."))
 
         print()
 
