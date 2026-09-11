@@ -83,6 +83,16 @@ def analyse_nmap():
         if service_result.get("cpe"):
             print("CPE:", service_result["cpe"])
 
+        if service_result.get("lookup_status") != "ok":
+            print(
+                "Lookup status:",
+                service_result.get("lookup_status", "Unknown"),
+            )
+            print(
+                "Lookup error:",
+                service_result.get("lookup_error", "No details provided"),
+            )
+
         if not service_result["cves"]:
             print("- No matching CVEs returned.")
 

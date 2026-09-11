@@ -246,6 +246,9 @@ def lookup_scan_cves(scan_results):
         if not isinstance(scan, dict):
             continue
 
+        if scan.get("state") != "open":
+            continue
+
         service = scan.get("service", "")
         version = scan.get("version", "")
         cpe_name = scan.get("cpe")
@@ -274,14 +277,28 @@ def lookup_scan_cves(scan_results):
                 lookup_method = "keyword_candidate"
 
         except requests.RequestException as error:
-            print(
-                f"CVE lookup failed for {cpe_name or keyword}: {error}"
-            )
+            results.append({
+                "port": scan.get("port"),
+                "service": service,
+                "version": version,
+                "cpe": cpe_name,
+                "lookup_method": lookup_method,
+                "cves": [],
+                "lookup_status": "failed",
+                "lookup_error": str(error),
+            })
             continue
         except ValueError as error:
-            print(
-                f"CVE lookup skipped for {cpe_name or keyword}: {error}"
-            )
+            results.append({
+                "port": scan.get("port"),
+                "service": service,
+                "version": version,
+                "cpe": cpe_name,
+                "lookup_method": lookup_method,
+                "cves": [],
+                "lookup_status": "skipped",
+                "lookup_error": str(error),
+            })
             continue
 
         results.append({
@@ -290,7 +307,8 @@ def lookup_scan_cves(scan_results):
             "version": version,
             "cpe": cpe_name,
             "lookup_method": lookup_method,
-            "cves": cves
+            "cves": cves,
+            "lookup_status": "ok",
         })
 
     return results

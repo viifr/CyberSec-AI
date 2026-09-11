@@ -30,11 +30,17 @@ VALID_PORT_STATES = {
     "open|closed",
     "closed|open",
 }
+MAX_SCAN_INPUT_SIZE = 2_000_000
+MAX_SCAN_LINES = 10_000
+MAX_SCAN_LINE_LENGTH = 10_000
 
 
 def normalize_scan_line(line):
     if not isinstance(line, str):
         raise ValueError("Scan input must be a string")
+
+    if len(line) > MAX_SCAN_LINE_LENGTH:
+        raise ValueError("Scan line exceeds supported length")
 
     return line.strip()
 
@@ -127,6 +133,7 @@ def parse_scan(scan):
         "state": normalized_state,
         "service": service,
         "version": version,
+        "source": cleaned,
     }
 
     return result
@@ -262,24 +269,38 @@ def parse_nmap_xml(xml_data, *, return_warnings=False):
 
 def parse_scans(scans, *, return_warnings=False):
     if isinstance(scans, str):
+        if len(scans) > MAX_SCAN_INPUT_SIZE:
+            raise ValueError("Nmap input exceeds supported size limit")
         if "<nmaprun" in scans[:500]:
             return parse_nmap_xml(scans, return_warnings=return_warnings)
         scans = scans.splitlines()
     else:
         scans = list(scans)
+        if len(scans) > MAX_SCAN_LINES:
+            raise ValueError("Nmap input contains too many lines")
         joined_scans = "\n".join(
             scan for scan in scans if isinstance(scan, str)
         )
+        if len(joined_scans) > MAX_SCAN_INPUT_SIZE:
+            raise ValueError("Nmap input exceeds supported size limit")
         if "<nmaprun" in joined_scans[:500]:
             return parse_nmap_xml(joined_scans, return_warnings=return_warnings)
+
+    if len(scans) > MAX_SCAN_LINES:
+        raise ValueError("Nmap input contains too many lines")
 
     results = []
     warnings = []
     current_host = None
     current_hostname = None
+    seen_ports = set()
 
-    for raw_scan in scans:
-        cleaned = normalize_scan_line(raw_scan)
+    for line_number, raw_scan in enumerate(scans, start=1):
+        try:
+            cleaned = normalize_scan_line(raw_scan)
+        except ValueError as error:
+            warnings.append(f"Ignored invalid line {line_number}: {error}")
+            continue
 
         if not cleaned:
             continue
@@ -309,8 +330,19 @@ def parse_scans(scans, *, return_warnings=False):
         try:
             result = parse_scan(cleaned)
         except ValueError as error:
-            warnings.append(f"Ignored invalid scan line: {cleaned} ({error})")
+            warnings.append(
+                f"Ignored invalid scan line {line_number}: {cleaned} ({error})"
+            )
             continue
+
+        port_key = (current_host, result["protocol"], result["port"])
+        if port_key in seen_ports:
+            warnings.append(
+                f"Ignored duplicate port on line {line_number}: "
+                f"{result['port']}/{result['protocol']}"
+            )
+            continue
+        seen_ports.add(port_key)
 
         if current_host is not None:
             result["host"] = current_host

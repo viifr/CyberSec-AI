@@ -28,6 +28,8 @@ MAX_HEADER_VALUE_LENGTH = 8192
 MAX_BODY_SIZE = 1_000_000
 MAX_REQUEST_SIZE = 2_000_000
 MAX_PARAMETER_PAIRS = 200
+MAX_PARAMETER_KEY_LENGTH = 200
+MAX_PARAMETER_VALUE_LENGTH = 8192
 
 
 def _is_valid_request_target(target):
@@ -87,6 +89,9 @@ def redact_request_data(request_data):
                 key: ("[REDACTED]" if is_sensitive_key(key) else redact_value(value))
                 for key, value in values.items()
             }
+
+    if redacted.get("body"):
+        redacted["body"] = "[REDACTED]"
 
     return redacted
 
@@ -165,7 +170,27 @@ def get_http_request():
 
 def extract_query_parameters(path):
     parsed_url = urlsplit(path)
-    return parse_qs(parsed_url.query, keep_blank_values=True)
+    return parse_qs(
+        parsed_url.query,
+        keep_blank_values=True,
+        max_num_fields=MAX_PARAMETER_PAIRS,
+    )
+
+
+def validate_parameters(parameters):
+    if len(parameters) > MAX_PARAMETER_PAIRS:
+        raise ValueError("Too many parameters in request")
+
+    for key, values in parameters.items():
+        if len(key) > MAX_PARAMETER_KEY_LENGTH:
+            raise ValueError("Parameter name exceeds supported length")
+
+        values = values if isinstance(values, list) else [values]
+        for value in values:
+            if len(str(value)) > MAX_PARAMETER_VALUE_LENGTH:
+                raise ValueError("Parameter value exceeds supported length")
+
+    return parameters
 
 
 def normalize_http_request(request):
@@ -222,18 +247,22 @@ def extract_body_parameters(body, headers):
     media_type = get_content_type(headers)
 
     if media_type == "application/x-www-form-urlencoded":
-        return parse_qs(body, keep_blank_values=True)
+        return validate_parameters(parse_qs(
+            body,
+            keep_blank_values=True,
+            max_num_fields=MAX_PARAMETER_PAIRS,
+        ))
 
     if media_type == "application/json":
         try:
             data = json.loads(body)
-        except json.JSONDecodeError:
-            return {}
+        except json.JSONDecodeError as error:
+            raise ValueError("Invalid JSON body") from error
 
         if isinstance(data, dict):
-            return data
+            return validate_parameters(data)
 
-        return {}
+        raise ValueError("JSON body must be an object")
 
     return {}
 
@@ -314,7 +343,7 @@ def parse_http_request(request):
     if len(headers) > MAX_PARAMETER_PAIRS:
         raise ValueError("Too many headers in request")
 
-    query_parameters = extract_query_parameters(path)
+    query_parameters = validate_parameters(extract_query_parameters(path))
     body_parameters = extract_body_parameters(body, headers)
     cookies = extract_cookies(headers)
 
