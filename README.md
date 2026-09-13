@@ -13,7 +13,7 @@ Ollama and Qwen.
   and raw request bodies before AI analysis
 - JSON and URL-encoded request body parsing with size limits
 - Nmap text and XML parsing with host, service, version, and CPE metadata
-- Nmap duplicate detection, source evidence, and parse warnings
+- Nmap duplicate detection, source evidence, parse warnings, and analysis limitations
 - AI-assisted Nmap and HTTP analysis with schema-validated responses
 - NVD CVE candidate lookup using CPE data when available
 - NVD retries, caching, rate-limit handling, CVSS/CWE/reference extraction,

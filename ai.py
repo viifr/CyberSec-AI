@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
 from ollama import chat, ResponseError
@@ -51,12 +51,14 @@ class NmapFinding(BaseModel):
     finding: str = Field(max_length=300)
     reason: str = Field(max_length=500)
     recommendation: str = Field(max_length=500)
+    evidence: list[Annotated[str, Field(max_length=300)]] = Field(max_length=5)
 
 
 class NmapAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     findings: list[NmapFinding] = Field(max_length=50)
+    limitations: list[Annotated[str, Field(max_length=300)]] = Field(max_length=10)
 
 
 class HttpArea(BaseModel):
@@ -230,9 +232,11 @@ low, medium, high
 
 Rules:
 - An open port alone is not a vulnerability.
-- Cite the specific evidence from the results for every finding.
+- Include one or more exact, scan-backed facts in each finding's evidence list.
 - Do not claim vulnerabilities without evidence.
 - Base findings only on the supplied information.
+- Include limitations that explain what Nmap alone cannot establish, such as
+    patch state, authentication requirements, configuration, or exploitability.
 - Keep findings concise.
 """
 

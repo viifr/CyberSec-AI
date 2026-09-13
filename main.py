@@ -45,8 +45,16 @@ def analyse_nmap():
         print("Confidence:", finding.get("confidence", "Unknown"))
         print("Finding:", finding.get("finding", "Unknown"))
         print("Reason:", finding.get("reason", "No reason provided"))
+        print("Evidence:")
+        for evidence in finding.get("evidence", []):
+            print("-", evidence)
         print("Recommendation:", finding.get("recommendation", "No recommendation provided"))
         print()
+
+    print("Limitations:")
+    for limitation in analysis.get("limitations", []):
+        print("-", limitation)
+    print()
 
     search_cves = input(
         "Search NVD for candidate CVEs? [y/N]: "
