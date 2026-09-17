@@ -1,6 +1,14 @@
 import time
 
-from ai import start_chat, analyse_scan, analyse_http, analyse_cve_candidates, AIError
+from ai import (
+    AIError,
+    analyse_cve_candidates,
+    analyse_http,
+    analyse_scan,
+    describe_model_status,
+    ensure_model_available,
+    start_chat,
+)
 from nmap_parser import get_scan, parse_scans
 from http_parser import get_http_request, parse_http_request, redact_request_data
 from cve_lookup import lookup_scan_cves
@@ -194,6 +202,17 @@ def analyse_http_request():
 
 
 def main():
+    print("Checking AI environment...")
+
+    try:
+        ensure_model_available()
+    except AIError as error:
+        print(f"Startup failed: {error}")
+        print("Install the required model and rerun the app.")
+        return
+
+    print(describe_model_status())
+
     while True:
         print("\nCyberSec AI")
         print("1. Ask a cybersecurity question")

@@ -26,6 +26,29 @@ Ollama and Qwen.
 - A downloaded Ollama model, such as `qwen3:8b`
 - Network access for NVD lookups, unless CVE lookup is skipped
 
+## Quick Start
+
+```bash
+cd /home/vee/cybersec-ai
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+ollama pull qwen3:8b
+python main.py
+```
+
+If Ollama is not running yet, start it first:
+
+```bash
+ollama serve
+```
+
+The AI model can be changed with `CYBERSEC_AI_MODEL`:
+
+```bash
+export CYBERSEC_AI_MODEL=qwen3:8b
+```
+
 ## Setup
 
 ```bash
@@ -33,12 +56,6 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ollama pull qwen3:8b
-```
-
-The AI model can be changed with `CYBERSEC_AI_MODEL`:
-
-```bash
-export CYBERSEC_AI_MODEL=qwen3:8b
 ```
 
 Optional NVD settings are controlled through environment variables:
@@ -51,12 +68,24 @@ Optional NVD settings are controlled through environment variables:
 ## Run
 
 ```bash
+source .venv/bin/activate
 python main.py
 ```
 
 The menu provides general chat, Nmap analysis, HTTP/Burp request analysis,
 and exit. Paste HTTP requests exactly as captured and type `END` on its own
 line when finished.
+
+## Troubleshooting
+
+- If startup fails with a model error, pull the required model:
+  `ollama pull qwen3:8b`
+- If Ollama is not reachable, start the service:
+  `ollama serve`
+- If you want a different model, export:
+  `export CYBERSEC_AI_MODEL=<your-model-name>`
+- If you are testing without live AI access, run the unit tests only:
+  `python -m pytest -q`
 
 ## Nmap Input
 

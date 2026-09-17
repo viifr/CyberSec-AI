@@ -4,8 +4,11 @@ import re
 from typing import Annotated, Literal
 
 import httpx
+import ollama
 from ollama import chat, ResponseError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+ollama_list = ollama.list
 
 from http_parser import redact_request_data
 
@@ -39,6 +42,57 @@ Focus on defensive and authorized security work.
 
 class AIError(Exception):
     """Raised when the AI backend is unreachable or returns an unusable response."""
+
+
+def ensure_model_available():
+    """Verify that the configured Ollama model is installed and usable."""
+    try:
+        models_response = ollama_list()
+    except (ResponseError, httpx.ConnectError, httpx.TimeoutException) as error:
+        raise AIError(
+            f"could not reach Ollama while checking model availability ({error})"
+        ) from error
+    except (ConnectionError, OSError) as error:
+        raise AIError(
+            f"could not inspect Ollama models ({error})"
+        ) from error
+    except Exception as error:
+        raise AIError(
+            f"could not inspect Ollama models ({error})"
+        ) from error
+
+    model_names = set()
+
+    if isinstance(models_response, dict):
+        raw_models = models_response.get("models", [])
+    elif isinstance(models_response, list):
+        raw_models = models_response
+    else:
+        raw_models = []
+
+    for entry in raw_models:
+        if isinstance(entry, dict):
+            name = entry.get("name") or entry.get("model") or entry.get("tag")
+        elif isinstance(entry, str):
+            name = entry
+        else:
+            name = None
+
+        if name:
+            model_names.add(name)
+
+    if MODEL not in model_names:
+        raise AIError(
+            f"model '{MODEL}' is not available in Ollama. Pull it with: "
+            f"ollama pull {MODEL}"
+        )
+
+    return True
+
+
+def describe_model_status():
+    """Return a brief human-friendly model status string for startup output."""
+    return f"Using Ollama model: {MODEL}"
 
 
 class NmapFinding(BaseModel):
