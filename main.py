@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 from ai import (
     AIError,
@@ -14,6 +15,35 @@ from http_parser import get_http_request, parse_http_request, redact_request_dat
 from cve_lookup import lookup_scan_cves
 
 
+def read_input_file(file_path):
+    path = Path(file_path).expanduser()
+
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+
+    return path.read_text(encoding="utf-8")
+
+
+def analyse_nmap_from_file():
+    try:
+        file_path = input("Enter the Nmap file path: ").strip()
+        if not file_path:
+            print("No file path provided.")
+            return
+
+        input_text = read_input_file(file_path)
+        results = parse_scans(input_text)
+    except (FileNotFoundError, ValueError) as error:
+        print(f"Could not read Nmap file: {error}")
+        return
+
+    if not results:
+        print("No valid Nmap results found in file.")
+        return
+
+    analyse_nmap_with_results(results)
+
+
 def analyse_nmap():
     scans = get_scan()
     results = parse_scans(scans)
@@ -22,6 +52,89 @@ def analyse_nmap():
         print("No valid Nmap results found.")
         return
 
+    analyse_nmap_with_results(results)
+
+
+def save_summary(file_path, summary_text):
+    path = Path(file_path).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(summary_text, encoding="utf-8")
+    return str(path)
+
+
+def format_nmap_summary(results, analysis):
+    lines = ["CyberSec AI - Nmap Summary", ""]
+
+    for result in results:
+        host = result.get("host") or result.get("hostname") or "unknown-host"
+        port = result.get("port", "unknown")
+        service = result.get("service", "unknown")
+        state = result.get("state", "unknown")
+        lines.append(f"- Host: {host} | Port: {port}/{result.get('protocol', 'tcp')} | Service: {service} | State: {state}")
+
+    lines.append("")
+    lines.append("Findings:")
+
+    for finding in analysis.get("findings", []):
+        if not isinstance(finding, dict):
+            continue
+        lines.append(
+            f"- Port {finding.get('port', 'unknown')}: {finding.get('finding', 'No finding provided')} "
+            f"({finding.get('severity', 'unknown').title()} / {finding.get('confidence', 'unknown').title()})"
+        )
+
+    lines.append("")
+    lines.append("Limitations:")
+    for limitation in analysis.get("limitations", []):
+        lines.append(f"- {limitation}")
+
+    return "\n".join(lines)
+
+
+def format_http_summary(request_data, analysis):
+    lines = ["CyberSec AI - HTTP Summary", ""]
+    lines.append(f"Request: {request_data.get('method', 'UNKNOWN')} {request_data.get('path', 'unknown')}")
+    lines.append(f"Host: {request_data.get('headers', {}).get('host', 'unknown')}")
+    lines.append("")
+    lines.append("Observations:")
+
+    for observation in analysis.get("observations", []):
+        lines.append(f"- {observation}")
+
+    lines.append("")
+    lines.append("Potential areas:")
+    for area in analysis.get("potential_areas", []):
+        if not isinstance(area, dict):
+            continue
+        lines.append(
+            f"- {area.get('name', 'Unknown')}: {area.get('reason', 'No reason provided')} "
+            f"({area.get('confidence', 'unknown').title()})"
+        )
+
+    lines.append("")
+    lines.append("Recommendations:")
+    for recommendation in analysis.get("recommendations", []):
+        lines.append(f"- {recommendation}")
+
+    return "\n".join(lines)
+
+
+def save_summary_prompt(summary_text):
+    save_choice = input("Save summary to a file? [y/N]: ").strip().lower()
+    if save_choice != "y":
+        return None
+
+    target = input("Enter output file path: ").strip()
+    if not target:
+        print("No output file path provided.")
+        return None
+
+    saved_path = save_summary(target, summary_text)
+    print(f"Summary saved to: {saved_path}")
+    return saved_path
+
+
+def analyse_nmap_with_results(results):
     print("\nParsed results:")
 
     for result in results:
@@ -42,6 +155,9 @@ def analyse_nmap():
 
     print(f"Analysis took {end - start:.2f} seconds.\n")
     print("CyberSec AI:\n")
+
+    summary_text = format_nmap_summary(results, analysis)
+    save_summary_prompt(summary_text)
 
     for finding in analysis.get("findings", []):
         if not isinstance(finding, dict):
@@ -159,6 +275,22 @@ def analyse_nmap():
         print()
 
 
+def analyse_http_request_from_file():
+    try:
+        file_path = input("Enter the HTTP request file path: ").strip()
+        if not file_path:
+            print("No file path provided.")
+            return
+
+        request = read_input_file(file_path)
+        request_data = parse_http_request(request)
+    except (FileNotFoundError, ValueError) as error:
+        print(f"Could not read HTTP request file: {error}")
+        return
+
+    analyse_http_request_with_data(request_data)
+
+
 def analyse_http_request():
     request = get_http_request()
 
@@ -169,6 +301,10 @@ def analyse_http_request():
         print("Invalid HTTP request:", error)
         return
 
+    analyse_http_request_with_data(request_data)
+
+
+def analyse_http_request_with_data(request_data):
     print("\nParsed request:")
     print(redact_request_data(request_data))
 
@@ -182,6 +318,9 @@ def analyse_http_request():
         return
 
     print("CyberSec AI:\n")
+
+    summary_text = format_http_summary(request_data, analysis)
+    save_summary_prompt(summary_text)
 
     print("Method:", request_data["method"])
     print("Path:", request_data["path"])
@@ -218,7 +357,9 @@ def main():
         print("1. Ask a cybersecurity question")
         print("2. Analyse Nmap results")
         print("3. Analyse HTTP/Burp Request")
-        print("4. Exit")
+        print("4. Analyse Nmap from file")
+        print("5. Analyse HTTP request from file")
+        print("6. Exit")
 
         try:
             choice = input("\nChoose an option: ").strip()
@@ -231,7 +372,7 @@ def main():
             print("Please choose an option.")
             continue
 
-        if choice == "4":
+        if choice == "6":
             print("Goodbye.")
             return
 
@@ -244,6 +385,12 @@ def main():
 
             elif choice == "3":
                 analyse_http_request()
+
+            elif choice == "4":
+                analyse_nmap_from_file()
+
+            elif choice == "5":
+                analyse_http_request_from_file()
 
             else:
                 print("Invalid option.")
